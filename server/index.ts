@@ -1,43 +1,28 @@
-import "dotenv/config";
-import express, { Request, Response, NextFunction } from "express";
-import cors from "cors";
-import { handleDemo } from "./routes/demo";
+import path from "path";
+import { createServer } from "./index";
+import express from "express";
 
-export function createServer() {
-  const app = express();
+const app = createServer();
+const port = process.env.PORT || 3000;
 
-  // Middlewares base
-  app.use(cors());
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
+const __dirname = import.meta.dirname;
+const distPath = path.join(__dirname, "../spa");
 
-  // Health check
-  app.get("/api/ping", (_req: Request, res: Response) => {
-    const ping = process.env.PING_MESSAGE ?? "pong";
-    res.json({ message: ping });
-  });
+// 👉 Archivos estáticos
+app.use(express.static(distPath));
 
-  // Rutas API
-  app.get("/api/demo", handleDemo);
+// 👉 Fallback para React Router (solo rutas NO API)
+app.get("*", (req, res, next) => {
+  if (req.path.startsWith("/api/") || req.path.startsWith("/health")) {
+    return next(); // deja pasar a la API
+  }
 
-  // Manejo de rutas no existentes
-  app.use((req: Request, res: Response) => {
-    res.status(404).json({
-      error: "Ruta no encontrada",
-      path: req.originalUrl,
-    });
-  });
+  res.sendFile(path.join(distPath, "index.html"));
+});
 
-  // Manejo global de errores
-  app.use(
-    (err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-      console.error("❌ Error en el servidor:", err);
+// 👉 No agregamos un 404 aquí.
+// El 404 de createServer() cubre solo rutas API.
 
-      res.status(500).json({
-        error: "Error interno del servidor",
-      });
-    }
-  );
-
-  return app;
-}
+app.listen(port, () => {
+  console.log(`🚀 Server running on port ${port}`);
+});
